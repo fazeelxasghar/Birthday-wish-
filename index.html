@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Farheen's Birthday Countdown 🎂</title>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html,body { height: 100%; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #ffe0ec, #e8d9ff);
+      color: #4a2140;
+      text-align: center;
+      padding: 20px;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+      padding: 40px 25px;
+      border-radius: 25px;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+      backdrop-filter: blur(6px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    header h1 {
+      font-size: 2.2rem;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      margin-bottom: 26px;
+      color: #5a2f53;
+    }
+
+    .countdown {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .box {
+      background: white;
+      padding: 18px 8px;
+      border-radius: 15px;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+      min-width: 64px;
+    }
+
+    .number {
+      display: block;
+      font-size: 2rem;
+      font-weight: 700;
+      color: #2e0f2f;
+    }
+
+    .label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      opacity: 0.75;
+      color: #5a2f53;
+    }
+
+    #birthday { display: none; animation: pop 900ms ease both; }
+    #birthday h2 { font-size: 2.25rem; margin-bottom: 12px; }
+
+    @keyframes pop {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @media (max-width:500px) {
+      header h1 { font-size: 1.6rem; }
+      .countdown { gap: 8px; }
+      .number { font-size: 1.4rem; }
+      .label { font-size: 0.65rem; }
+    }
+
+    /* Respect reduced motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      #birthday { animation: none; }
+    }
+
+    /* Canvas covers the container for confetti */
+    #confetti-canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <header>
+      <h1>🎂 Farheen's Birthday 🎂</h1>
+      <p class="subtitle">Something special is coming... ❤️</p>
+    </header>
+
+    <!-- Semantic time element with machine-readable datetime -->
+    <p style="display:none;">
+      <time id="target-time" datetime="2026-09-22T00:00:00+05:00">2026-09-22 00:00 PKT</time>
+    </p>
+
+    <!-- role="timer" + aria-live so assistive tech is notified of updates -->
+    <section id="countdown" class="countdown" role="timer" aria-live="polite" aria-atomic="true">
+      <div class="box" aria-hidden="false">
+        <span id="days" class="number" aria-label="Days remaining">00</span>
+        <span class="label">Days</span>
+      </div>
+
+      <div class="box">
+        <span id="hours" class="number" aria-label="Hours remaining">00</span>
+        <span class="label">Hours</span>
+      </div>
+
+      <div class="box">
+        <span id="minutes" class="number" aria-label="Minutes remaining">00</span>
+        <span class="label">Minutes</span>
+      </div>
+
+      <div class="box">
+        <span id="seconds" class="number" aria-label="Seconds remaining">00</span>
+        <span class="label">Seconds</span>
+      </div>
+    </section>
+
+    <section id="birthday" aria-live="polite">
+      <h2>🎉 Happy Birthday Farheen! 🎉</h2>
+      <p>
+        May your special day be filled with happiness,
+        beautiful memories, endless smiles and lots of love. ❤️
+        <br><br>
+        Wishing you an amazing year ahead! 🥳🎂✨
+      </p>
+    </section>
+
+    <!-- Canvas for confetti -->
+    <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+  </div>
+
+  <script>
+    // Use the machine-readable datetime from the <time> element.
+    const timeEl = document.getElementById('target-time');
+    const targetString = timeEl ? timeEl.getAttribute('datetime') : null;
+
+    // Try parsing ISO with explicit offset first. If parsing fails, fall back to constructing
+    // the UTC epoch for the intended moment (here: 2026-09-22 00:00 PKT which is UTC 2026-09-21 19:00).
+    let birthday = targetString ? Date.parse(targetString) : NaN;
+
+    if (Number.isNaN(birthday)) {
+      // Fallback to explicit UTC timestamp for Pakistan midnight (PKT = UTC+05:00).
+      birthday = Date.UTC(2026, 8, 21, 19, 0, 0); // months are 0-indexed: 8 => September
+    }
+
+    let timerId = null;
+
+    function updateCountdown() {
+      const now = Date.now();
+      const diff = birthday - now;
+
+      if (diff <= 0) {
+        // Stop timer and reveal the birthday message
+        if (timerId !== null) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+        const countdownEl = document.getElementById('countdown');
+        const birthdayEl = document.getElementById('birthday');
+
+        if (countdownEl) countdownEl.style.display = 'none';
+        if (birthdayEl) birthdayEl.style.display = 'block';
+
+        // Ensure screen readers get an announcement (aria-live on #birthday)
+        birthdayEl && birthdayEl.setAttribute('tabindex', '-1');
+        try { birthdayEl && birthdayEl.focus(); } catch (e) { /* ignore */ }
+
+        // Launch confetti unless user prefers reduced motion
+        if (!window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          launchConfetti();
+        }
+
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+
+      // Update DOM (textContent is more efficient than innerHTML for plain text)
+      document.getElementById('days').textContent = String(days).padStart(2, '0');
+      document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+      document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+      document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+    }
+
+    // Run once immediately and then every second. Keep a reference so we can clear it.
+    updateCountdown();
+    timerId = setInterval(updateCountdown, 1000);
+
+    // --- Simple confetti implementation (no external libs) ---
+    function launchConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      let width = canvas.width = canvas.clientWidth;
+      let height = canvas.height = canvas.clientHeight;
+
+      // Resize handler
+      function onResize() {
+        width = canvas.width = canvas.clientWidth;
+        height = canvas.height = canvas.clientHeight;
+      }
+      window.addEventListener('resize', onResize);
+
+      const particles = [];
+      const colors = ['#ff6b6b', '#ffd93d', '#6bcB77', '#7aa2ff', '#c27cff', '#ff9f43'];
+
+      function random(min, max) { return Math.random() * (max - min) + min; }
+
+      function createParticle() {
+        return {
+          x: random(width * 0.2, width * 0.8),
+          y: random(-20, -50),
+          size: random(6, 12),
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: random(0, 2 * Math.PI),
+          velocityX: random(-2.5, 2.5),
+          velocityY: random(2, 6),
+          angularVelocity: random(-0.15, 0.15),
+          life: 0,
+          ttl: random(80, 160)
+        };
+      }
+
+      // burst: generate many particles
+      const burstCount = 120;
+      for (let i = 0; i < burstCount; i++) particles.push(createParticle());
+
+      let running = true;
+      let frameId = null;
+      let ticks = 0;
+      function render() {
+        ctx.clearRect(0, 0, width, height);
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.velocityX;
+          p.y += p.velocityY;
+          p.velocityY += 0.12; // gravity
+          p.rotation += p.angularVelocity;
+          p.life++;
+
+          // draw as rotated rectangle for a confetti-like look
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+          ctx.restore();
+
+          // remove when life exceeded or out of bounds
+          if (p.life > p.ttl || p.y - p.size > height) {
+            particles.splice(i, 1);
+          }
+        }
+
+        // keep adding a few smaller particles for a trailing effect for a short time
+        if (ticks < 160) {
+          for (let j = 0; j < 2; j++) particles.push(createParticle());
+        }
+
+        ticks++;
+
+        if (particles.length === 0) {
+          running = false;
+        }
+
+        if (running) frameId = requestAnimationFrame(render);
+      }
+
+      render();
+
+      // Stop after ~8 seconds and cleanup
+      setTimeout(() => {
+        running = false;
+        if (frameId) cancelAnimationFrame(frameId);
+        window.removeEventListener('resize', onResize);
+        // clear canvas after a moment
+        setTimeout(() => ctx.clearRect(0, 0, width, height), 300);
+      }, 8000);
+    }
+  </script>
+</body>
+</html>
